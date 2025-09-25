@@ -133,8 +133,16 @@ public class GameLogic {
     }
 
     // --- Getters et Setters ---
-    public char[][] getBoard() { return this.board; }
-    public char getCurrentPlayerSymbol() { return this.currentPlayerSymbol; }
-    public boolean isGameOver() { return this.isGameOver; }
-    public void setGameOver(boolean isOver) { this.isGameOver = isOver; }
+    public char[][] getBoard() { 
+        return this.board; 
+    }
+    public char getCurrentPlayerSymbol() { 
+        return this.currentPlayerSymbol; 
+    }
+    public boolean isGameOver() { 
+        return this.isGameOver; 
+    }
+    public void setGameOver(boolean isOver) { 
+        this.isGameOver = isOver; 
+    }
 }

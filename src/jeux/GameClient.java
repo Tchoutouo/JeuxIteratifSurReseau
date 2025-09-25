@@ -94,11 +94,11 @@ public class GameClient implements GameController {
                 ui.setStatusMessage(myTurn ? "La partie commence! C'est à vous." : "C'est le tour de " + opponentPseudo + ".");
                 break;
             case "VALID_MOVE":
-                 String[] moveData = data.split(";");
-                 this.board[Integer.parseInt(moveData[0])][Integer.parseInt(moveData[1])] = moveData[2].charAt(0);
-                 ui.updateBoard(this.board);
-                 myTurn = (moveData[2].charAt(0) != mySymbol);
-                 ui.setStatusMessage(myTurn ? "C'est à votre tour." : "C'est le tour de " + opponentPseudo + ".");
+                String[] moveData = data.split(";");
+                this.board[Integer.parseInt(moveData[0])][Integer.parseInt(moveData[1])] = moveData[2].charAt(0);
+                ui.updateBoard(this.board);
+                myTurn = (moveData[2].charAt(0) != mySymbol);
+                ui.setStatusMessage(myTurn ? "C'est à votre tour." : "C'est le tour de " + opponentPseudo + ".");
                 break;
             case "GAME_OVER":
             	gameOver = true;

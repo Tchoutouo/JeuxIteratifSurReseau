@@ -219,11 +219,11 @@ public class GameServer implements GameController {
         }
 
         private void handlePlayAgainResponse(String message) {
-             if (message.endsWith("OUI")) {
-                 resetGame();
-             } else {
-                 ui.setStatusMessage(opponentPseudo + " a refusé. La partie est terminée.");
-             }
+            if (message.endsWith("OUI")) {
+                resetGame();
+            } else {
+                ui.setStatusMessage(opponentPseudo + " a refusé. La partie est terminée.");
+            }
         }
         
         private void resetGame() {
@@ -236,7 +236,7 @@ public class GameServer implements GameController {
         }
         
         /**
-         * CORRECTION : Gère la déconnexion de l'adversaire.
+         * Pour gérer la déconnexion de l'adversaire.
          * Le serveur ne s'arrête pas, il se réinitialise pour attendre un nouveau joueur.
          */
         private void handleDisconnect(boolean graceful) {
