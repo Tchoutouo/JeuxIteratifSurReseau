@@ -38,7 +38,7 @@ Ce projet a été développé dans le cadre du module de **Conception et Archite
 2.  Ouvrez un terminal et naviguez jusqu'au dossier racine du projet.
 3.  Compilez tous les fichiers source Java en exécutant la commande suivante :
     ```bash
-    javac jeux/*.java
+    javac src/jeux/*.java
     ```
 
 ## Comment Jouer 🚀
