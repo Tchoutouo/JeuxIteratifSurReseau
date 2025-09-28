@@ -7,8 +7,10 @@ import javax.swing.SwingUtilities;
 
 /**
  * Le contrôleur côté Serveur. Il est le "maître du jeu".
- * - Gère l'instance de GameLogic et l'UI pour le joueur local (serveur).
- * - Ouvre une connexion réseau et attend les clients.
+ * - Gère l'instance de GameLogic (le "cerveau" du jeu).
+ * - Gère l'interface graphique (GameUI) pour le joueur local (serveur).
+ * - Ouvre une connexion réseau et attend un client.
+ * - Gère un "ClientHandler" pour communiquer avec le client distant.
  * - Valide les coups et maintient l'état de la partie.
  */
 public class GameServer implements GameController {
@@ -19,10 +21,13 @@ public class GameServer implements GameController {
     private String myPseudo;
     private String opponentPseudo;
     private final int gridSize;
-    private final char mySymbol = 'X';
+    private final char mySymbol = 'X'; // Le serveur est toujours le joueur 'X'.
     private volatile boolean gameStarted = false;
 
-    // États du serveur pour une gestion robuste des connexions.
+    /**
+     * États possibles du serveur pour gérer les connexions de manière robuste.
+     * volatile assure que les changements de cet état sont visibles par tous les threads.
+     */
     private enum ServerState { WAITING, PLAYING, GAME_OVER }
     private volatile ServerState currentState = ServerState.WAITING;
 
@@ -32,36 +37,41 @@ public class GameServer implements GameController {
     }
 
     /**
-     * Démarre l'UI et le thread réseau du serveur.
+     * Démarre l'interface graphique et lance le thread réseau du serveur.
      */
     public void startServer() {
+        // Crée l'UI sur le thread dédié de Swing (Event Dispatch Thread) pour éviter les conflits.
         SwingUtilities.invokeLater(() -> {
             game = new GameLogic(gridSize);
             ui = new GameUI(gridSize, this);
         });
+        // Lance la logique réseau dans un thread séparé pour ne pas geler l'UI.
         new Thread(this::runServerLogic).start();
     }
     
     /**
-     * Boucle principale du serveur qui attend les connexions.
+     * La boucle principale du serveur qui attend les connexions des clients.
+     * S'exécute dans un thread d'arrière-plan.
      */
     private void runServerLogic() {
         try (ServerSocket serverSocket = new ServerSocket(6789)) {
             String ip = InetAddress.getLocalHost().getHostAddress();
             SwingUtilities.invokeLater(() -> ui.setStatusMessage("En attente d'un adversaire sur " + ip + "..."));
 
-            // Le serveur tourne indéfiniment pour accepter plusieurs parties.
+            // Le serveur tourne indéfiniment pour pouvoir accepter de nouvelles parties après une déconnexion.
             while (true) {
-                Socket clientSocket = serverSocket.accept(); // Attend une connexion.
+                // Opération bloquante : le thread attend ici qu'un client se connecte.
+                Socket clientSocket = serverSocket.accept();
+                
                 if (currentState != ServerState.WAITING) {
-                    // Si une partie est en cours ou terminée (mais non relancée), on refuse.
+                    // Si une partie est en cours ou terminée (non relancée), on refuse poliment le nouveau client.
                     new PrintWriter(clientSocket.getOutputStream(), true).println("SERVER_BUSY");
                     clientSocket.close();
                 } else {
                     // Un client est accepté, on passe en mode "JEU".
                     currentState = ServerState.PLAYING;
                     this.outToClient = new PrintWriter(clientSocket.getOutputStream(), true);
-                    // On lance un thread dédié pour gérer ce client.
+                    // On lance un thread dédié pour gérer la communication avec ce client.
                     new Thread(new ClientHandler(clientSocket)).start();
                 }
             }
@@ -72,41 +82,50 @@ public class GameServer implements GameController {
 
     /**
      * Gère les clics du joueur local (serveur) sur la grille.
+     * Méthode de l'interface GameController.
      */
     @Override
     public void onGridCellClicked(int x, int y) {
+        // On ne peut jouer que si la partie a commencé, que c'est notre tour et que la partie n'est pas finie.
         if (gameStarted && game.getCurrentPlayerSymbol() == mySymbol && !game.isGameOver()) {
-            synchronized (game) { // Accès synchronisé à l'objet partagé 'game'.
+            // 'synchronized' empêche les conflits si le client joue en même temps (protection contre les race conditions).
+            synchronized (game) {
                 if (game.placeSymbol(x, y)) {
                     ui.updateBoard(game.getBoard());
+                    // On informe le client que le coup est valide.
                     outToClient.println("VALID_MOVE:" + x + ";" + y + ";" + mySymbol);
                     
                     // On vérifie si ce coup termine la partie.
                     if (checkEndGame(x, y)) return;
                     
+                    // Si la partie continue, on passe le tour.
                     game.switchPlayer();
-                    ui.setStatusMessage("C'est le tour de " + opponentPseudo + "...");
+                    ui.setStatusMessage("C'est le tour de " + opponentPseudo + ".");
                 }
             }
         }
     }
     
     /**
-     * Vérifie la fin de partie (victoire/nul) et met à jour l'état et l'UI.
+     * Vérifie si la partie est terminée (victoire/nul) et met à jour l'état et l'UI.
      * @param x, y Les coordonnées du dernier coup pour une détection efficace.
+     * @return true si la partie est terminée, false sinon.
      */
     private boolean checkEndGame(int x, int y) {
-        // On appelle game.checkWin avec les bonnes coordonnées.
         boolean isWin = game.checkWin(x, y);
-        System.out.println("--- DEBUG (Serveur) --- checkEndGame appelé pour (" + x + "," + y + "). Résultat de isWin: " + isWin);
         boolean isDraw = !isWin && game.isBoardFull();
 
         if (isWin) {
             String winnerName = game.getCurrentPlayerSymbol() == mySymbol ? myPseudo : opponentPseudo;
             SwingUtilities.invokeLater(() -> {
-                // On utilise une boîte de dialogue pour annoncer le résultat.
-                String finalMessage = "FIN DE PARTIE: " + winnerName + " a gagné !";
-                JOptionPane.showMessageDialog(ui, finalMessage, "Partie terminée", JOptionPane.INFORMATION_MESSAGE);
+            	if(myPseudo == winnerName) {
+            		String finalMessage = "FIN DE PARTIE: Vous avez gagné !";
+                    JOptionPane.showMessageDialog(ui, finalMessage, "Partie terminée", JOptionPane.INFORMATION_MESSAGE);
+            	}else {
+            		String finalMessage = "FIN DE PARTIE: " + winnerName + " a gagné !";
+                    JOptionPane.showMessageDialog(ui, finalMessage, "Partie terminée", JOptionPane.INFORMATION_MESSAGE);
+            	}
+                
                 ui.showEndGameOptions();
             });
             outToClient.println("GAME_OVER:VICTORY;" + winnerName);
@@ -114,7 +133,6 @@ public class GameServer implements GameController {
             return true;
         } else if (isDraw) {
             SwingUtilities.invokeLater(() -> {
-                // On utilise une boîte de dialogue pour annoncer le résultat.
                 JOptionPane.showMessageDialog(ui, "FIN DE PARTIE: Match Nul !", "Partie terminée", JOptionPane.INFORMATION_MESSAGE);
                 ui.showEndGameOptions();
             });
@@ -146,7 +164,8 @@ public class GameServer implements GameController {
     }
 
     /**
-     * Thread interne qui gère la communication avec un client.
+     * Thread interne qui gère toute la communication avec un client connecté.
+     * Chaque client a son propre ClientHandler.
      */
     private class ClientHandler implements Runnable {
         private final Socket clientSocket;
@@ -161,10 +180,11 @@ public class GameServer implements GameController {
         public void run() {
             try {
                 // Étape 1: Échange des informations initiales
-                opponentPseudo = in.readLine().split(":")[1];
+                opponentPseudo = in.readLine().split(":")[1]; // Attend le message CONNECT du client
                 SwingUtilities.invokeLater(() -> ui.setTitle(myPseudo + " (" + mySymbol + ") vs " + opponentPseudo + " (O)"));
 
-                // Étape 2: Envoi des paramètres de la partie
+                // Étape 2: Envoi des paramètres de la partie au client
+                outToClient.println("WELCOME:O"); // Informe le client de son symbole
                 outToClient.println("START_GAME:" + myPseudo + ";" + opponentPseudo + ";" + game.getCurrentPlayerSymbol() + ";" + gridSize);
                 gameStarted = true;
                 SwingUtilities.invokeLater(() -> ui.setStatusMessage("Partie commencée! C'est à vous de jouer."));
@@ -184,12 +204,14 @@ public class GameServer implements GameController {
             }
         }
 
+        /** Traite un message reçu du client. */
         private void processClientMessage(String message) {
             if (message.startsWith("MOVE:")) handleMove(message);
             else if ("PLAY_AGAIN_REQUEST".equals(message)) handlePlayAgainRequest();
             else if (message.startsWith("PLAY_AGAIN_RESPONSE:")) handlePlayAgainResponse(message);
         }
 
+        /** Gère un coup reçu du client. */
         private void handleMove(String message) {
             if (game.getCurrentPlayerSymbol() == 'O') {
                 String[] parts = message.split(":")[1].split(";");
@@ -201,13 +223,14 @@ public class GameServer implements GameController {
                         outToClient.println("VALID_MOVE:" + x + ";" + y + ";O");
                         if (!checkEndGame(x, y)) {
                             game.switchPlayer();
-                            ui.setStatusMessage("C'est à votre tour de jouer...");
+                            ui.setStatusMessage("C'est à votre tour.");
                         }
                     }
                 }
             }
         }
 
+        /** Gère une demande de revanche reçue du client. */
         private void handlePlayAgainRequest() {
             int choice = JOptionPane.showConfirmDialog(ui, opponentPseudo + " veut rejouer. Accepter ?", "Demande de revanche", JOptionPane.YES_NO_OPTION);
             outToClient.println("PLAY_AGAIN_RESPONSE:" + (choice == JOptionPane.YES_OPTION ? "OUI" : "NON"));
@@ -218,27 +241,27 @@ public class GameServer implements GameController {
             }
         }
 
+        /** Gère la réponse à une demande de revanche. */
         private void handlePlayAgainResponse(String message) {
-            if (message.endsWith("OUI")) {
-                resetGame();
-            } else {
-                ui.setStatusMessage(opponentPseudo + " a refusé. La partie est terminée.");
-            }
+             if (message.endsWith("OUI")) {
+                 resetGame();
+             } else {
+                 ui.setStatusMessage(opponentPseudo + " a refusé. La partie est terminée.");
+             }
         }
         
+        /** Réinitialise le jeu pour une nouvelle partie. */
         private void resetGame() {
             game.reset();
             currentState = ServerState.PLAYING;
             ui.updateBoard(game.getBoard());
             ui.hideEndGameOptions();
+            ui.setTitle(myPseudo + " (" + mySymbol + ") vs " + opponentPseudo + " (O)");
             ui.setStatusMessage("Nouvelle partie ! C'est à vous.");
             outToClient.println("RESET_GAME");
         }
         
-        /**
-         * Pour gérer la déconnexion de l'adversaire.
-         * Le serveur ne s'arrête pas, il se réinitialise pour attendre un nouveau joueur.
-         */
+        /** Gère la déconnexion de l'adversaire et remet le serveur en attente. */
         private void handleDisconnect(boolean graceful) {
             if (!game.isGameOver()) {
                 String message = graceful ? "L'adversaire a quitté la partie." : "L'adversaire s'est déconnecté brutalement.";
@@ -246,10 +269,10 @@ public class GameServer implements GameController {
             }
             // Réinitialisation de l'état du serveur
             gameStarted = false;
-            currentState = ServerState.WAITING; // Le serveur est de nouveau en attente
-            game.reset(); // On nettoie la grille
+            currentState = ServerState.WAITING; // Le serveur est de nouveau en attente.
+            game.reset(); // On nettoie la grille.
             
-            // Mise à jour de l'UI du serveur pour refléter le nouvel état
+            // Mise à jour de l'UI du serveur pour refléter le nouvel état.
             SwingUtilities.invokeLater(() -> {
                 ui.updateBoard(game.getBoard());
                 ui.hideEndGameOptions();

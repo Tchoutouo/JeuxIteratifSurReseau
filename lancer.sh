@@ -4,5 +4,7 @@
 
 echo "Lancement de l'application..."
 
+#ce positionne dans le dossier src
+cd src
 # Exécute la classe principale qui contient la méthode main
-java src.jeux.GameApp
+java jeux.GameApp
