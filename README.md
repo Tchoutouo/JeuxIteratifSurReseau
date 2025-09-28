@@ -31,21 +31,58 @@ Ce projet a été développé dans le cadre du module de **Conception et Archite
 - **Modèle de Conception** : Le projet suit une architecture inspirée de **Modèle-Vue-Contrôleur (MVC)** pour séparer la logique du jeu (`GameLogic`), l'affichage (`GameUI`) et la gestion des actions/réseau (`GameServer`, `GameClient`).
 
 ## Prérequis
-- [Java Development Kit (JDK)](https://www.oracle.com/java/technologies/downloads/) - Version 9 ou supérieure.
+- [Java Development Kit (JDK)](https://www.oracle.com/java/technologies/downloads/) - Version 21 (compatible avec la version 9 ou supérieure).
 
 ## Installation et Compilation
 1.  Clonez ou téléchargez ce dépôt sur votre machine locale.
 2.  Ouvrez un terminal et naviguez jusqu'au dossier racine du projet.
-3.  Compilez tous les fichiers source Java en exécutant la commande suivante :
-    ```bash
-    javac src/jeux/*.java
-    ```
 
 ## Comment Jouer 🚀
 
 Pour jouer, vous devez lancer l'application deux fois : une pour le serveur et une pour le client.
 
-#### 1. Lancer le Serveur (Joueur 1)
-- Dans un terminal, exécutez la commande :
+**Procédure :** Deux méthodes sont possibles pour compiler le projet depuis son dossier racine :
+### 1.Méthode Recommandée (Avec les Scripts) :
+- Sous Linux ou macOS : Ouvrez un terminal et exécutez le script
+  ```bash
+  ./compiler.sh
+  ```
+- Sous Windows : Ouvrez une invite de commandes et exécutez le script compiler.bat. Ces scripts exécutent la commande de compilation pour vous.
+### 2.Méthode Manuelle :
+- Ouvrez un terminal ou une invite de commandes.
+- Assurez-vous d'être dans le dossier racine du projet:
+```bash
+cd src/
+```
+- Exécutez la commande suivante :
+```bash
+javac jeux/*.java
+```
+
+À la fin de ce processus, les fichiers .class correspondants seront générés dans le dossier jeux.
+## B.Exécution de l'Application
+### Étape 1 : Lancement
+- **Avec les scripts :**
+  Exécutez
+  ```bash
+  ./lancer.sh #(Linux/macOS) ou
+  lancer.bat #(Windows).
+  ```
+- **Manuellement :**
+  Exécutez
   ```bash
   java jeux.GameApp
+  ```
+Une boîte de dialogue s'ouvrira, vous demandant de choisir un rôle.
+### Étape 2 : Pour le Joueur 1 (Hôte / Serveur)
+1. Cliquez sur **"Héberger une partie"**.
+2. Dans les fenêtres suivantes, entrez la taille de la grille souhaitée, puis votre pseudonyme.
+3. La fenêtre du jeu s'ouvrira. Le serveur est maintenant en attente.
+4. Communiquez votre adresse **IP locale (ex: 192.168.1.25)** à l'autre joueur.
+### Étape 3 : Pour le Joueur 2 (Client)
+1. Lancez également l'application.
+2. Cliquez sur **"Rejoindre une partie"**.
+3. Dans la fenêtre qui s'ouvre, entrez l'adresse IP fournie par le Joueur 1.
+4. Entrez votre pseudonyme.
+5. La connexion s'établit et la partie commence !
+Note sur les Tests en Local : Pour tester l'application sur une seule machine, lancez une instance en tant que serveur, puis une seconde en tant que client. Pour l'adresse IP, utilisez **127.0.1.1**.
